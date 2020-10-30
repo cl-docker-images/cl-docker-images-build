@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 declare -a ARCHES
 declare -a OSES
 declare -a ALPINE_VERSIONS
