@@ -120,13 +120,20 @@ build() {
   local base_name
   platform="$(docker_platform)"
   base_name="$(build_image_name)"
+  local extra_buildargs
+  if [ -n "$DOCKER_BUILDKIT" ]; then
+    extra_buildargs="--progress=plain $EXTRA_BUILDARGS"
+  else
+    extra_buildargs="$EXTRA_BUILDARGS"
+  fi
+
   docker build --platform "$platform" \
                -t "$base_name$BUILD_TAG_SUFFIX" \
                --cache-from "$base_name" \
                --cache-from "$base_name-tmp" \
                --cache-from "$base_name-tmp-master" \
                --build-arg BUILDKIT_INLINE_CACHE=1 \
-               $EXTRA_BUILDARGS \
+               $extra_buildargs \
                -f "$VERSION/$OS_NAME/$OS_VERSION/$ARCH/Dockerfile$VARIANT_DOCKERFILE" \
                "$VERSION/$OS_NAME/$OS_VERSION/$ARCH"
 }
