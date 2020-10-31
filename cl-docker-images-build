@@ -332,7 +332,7 @@ release_shared_manifests() {
 
 }
 
-while getopts v:c:t:o:O:a: opt; do
+while getopts v:c:t:o:O:a:d opt; do
   case $opt in
     v)
       VERSION="$OPTARG"
@@ -353,10 +353,17 @@ while getopts v:c:t:o:O:a: opt; do
     a)
       ARCH="$OPTARG"
       ;;
+    d)
+      DEBUG="yes"
+      ;;
   esac
 done
 
 shift "$((OPTIND-1))"
+
+if [ -n "$DEBUG" ]; then
+  set -x
+fi
 
 process_default_env
 
