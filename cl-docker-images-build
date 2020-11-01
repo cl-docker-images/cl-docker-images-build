@@ -10,6 +10,25 @@ declare -a UBUNTU_VERSIONS
 declare -a VARIANTS
 declare -a WINDOWSSERVERCORE_VERSIONS
 
+retry() {
+  local -i max_attempts="$1"; shift
+  local -i attempt_num=1
+  local -i sleep_time=10
+  until "$@"
+  do
+    if ((attempt_num==max_attempts))
+    then
+      echo "Failed to run command after $max_attempts tries" >&2
+      return 1
+    else
+      echo "Try $attempt_num failed! Trying again in $sleep_time seconds..." >&2
+      sleep $sleep_time
+      sleep_time=$((attempt_num * 10 + sleep_time))
+      attempt_num=$((attempt_num + 1))
+    fi
+  done
+}
+
 process_default_env() {
   if [ -f default-values.env ]; then
     local var_name
@@ -151,7 +170,7 @@ push_build_image() {
   local base_name
   base_name="$(build_image_name)"
 
-  docker push "$base_name$BUILD_TAG_SUFFIX"
+  retry 5 docker push "$base_name$BUILD_TAG_SUFFIX"
 }
 
 os_latest_version() {
@@ -208,29 +227,29 @@ pull_retag_and_push_linux_arch_images() {
           build_image_name="$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$os_sep$os_version$variant_tag-tmp-master"
           docker pull "$build_image_name"
           docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$os_sep$os_version$variant_tag"
-          docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$os_sep$os_version$variant_tag"
+          retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$os_sep$os_version$variant_tag"
           if [ "$VERSION" = "$LATEST_VERSION" ]; then
             docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest-$os$os_sep$os_version$variant_tag"
-            docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest-$os$os_sep$os_version$variant_tag"
+            retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest-$os$os_sep$os_version$variant_tag"
             docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$os$os_sep$os_version$variant_tag"
-            docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$os$os_sep$os_version$variant_tag"
+            retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$os$os_sep$os_version$variant_tag"
           fi
 
           if [ "$os_version" = "$os_latest_version" ]; then
             docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$variant_tag"
-            docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$variant_tag"
+            retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION-$os$variant_tag"
             if [ "$VERSION" = "$LATEST_VERSION" ]; then
               docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest-$os$variant_tag"
-              docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest-$os$variant_tag"
+              retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest-$os$variant_tag"
               docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$os$variant_tag"
-              docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$os$variant_tag"
+              retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$os$variant_tag"
             fi
             if [ "$os" = "$DEFAULT_LINUX_OS" ]; then
               docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION$variant_tag"
-              docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION$variant_tag"
+              retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$VERSION$variant_tag"
               if [ "$VERSION" = "$LATEST_VERSION" ]; then
                 docker tag "$build_image_name" "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest$variant_tag"
-                docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest$variant_tag"
+                retry 5 docker push "$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:latest$variant_tag"
               fi
             fi
           fi
@@ -250,7 +269,7 @@ create_manifest_for_arches() {
     valid_images+=("$IMAGE_BUILD_NAMESPACE$arch_suffix/$IMAGE_NAME:$tag")
   done
   docker manifest create "$IMAGE_TARGET_NAMESPACE/$IMAGE_NAME:$tag" "${valid_images[@]}"
-  docker manifest push -p "$IMAGE_TARGET_NAMESPACE/$IMAGE_NAME:$tag"
+  retry 5 docker manifest push -p "$IMAGE_TARGET_NAMESPACE/$IMAGE_NAME:$tag"
 }
 
 release_linux_manifests() {
